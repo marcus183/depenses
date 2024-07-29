@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histogramme des Dépenses</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        canvas {
+            max-width: 100%;
+        }
+        button {
+            border: 2px solid gold;
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .return {
+            background-color: lightsteelblue;
+        }
+        .year-selector {
+            background-color: lightgoldenrodyellow;
+            color: black;
+        }
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 80%;
+        }
+        th, td {
+            border: 1px solid gold;
+            padding: 10px;
+            color: black;
+            background-color: lightsteelblue;
+        }
+        th {
+            background-color: gold;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Histogramme des Dépenses</h1>
+    <button class="return" onclick="window.location.href='index.html'">Retour</button>
+    <button class="year-selector" onclick="selectYear()">Sélectionner Année</button>
+    <button class="year-selector" onclick="downloadData()">Télécharger JSON</button>
+    <input type="file" id="fileInput" style="display:none;" onchange="restoreData(event)">
+    <button class="year-selector" onclick="document.getElementById('fileInput').click()">Restaurer JSON</button>
+    <canvas id="expenseChart"></canvas>
+    <table id="monthlyTotalsTable" style="display: none;">
+        <thead>
+            <tr>
+                <th>Jan</th>
+                <th>Fév</th>
+                <th>Mar</th>
+                <th>Avr</th>
+                <th>Mai</th>
+                <th>Juin</th>
+                <th>Juil</th>
+                <th>Août</th>
+                <th>Sep</th>
+                <th>Oct</th>
+                <th>Nov</th>
+                <th>Déc</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="monthlyTotals"></tr>
+        </tbody>
+    </table>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+
+        function getMonthlyData(year) {
+            const data = {
+                alimentation: Array(12).fill(0),
+                internet: Array(12).fill(0),
+                loisir: Array(12).fill(0),
+                divers: Array(12).fill(0)
+            };
+
+            expenses.forEach(expense => {
+                const expenseDate = new Date(expense.date.split('/').reverse().join('-'));
+                if (expenseDate.getFullYear() === year) {
+                    const month = expenseDate.getMonth();
+                    data[expense.category][month] += parseFloat(expense.amount);
+                }
+            });
+
+            return data;
+        }
+
+        function createChart(year) {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            const monthlyData = getMonthlyData(year);
+            const totalMonthlyExpenses = monthlyData.alimentation.map((_, i) => {
+                return monthlyData.alimentation[i] + monthlyData.internet[i] + monthlyData.loisir[i] + monthlyData.divers[i];
+            });
+
+            const data = {
+                labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+                datasets: [
+                    {
+                        label: 'Alimentation',
+                        backgroundColor: 'lightcoral',
+                        borderColor: 'gold',
+                        data: monthlyData.alimentation.map((value, i) => (value / totalMonthlyExpenses[i] * 100).toFixed(2))
+                    },
+                    {
+                        label: 'Internet',
+                        backgroundColor: 'lightyellow',
+                        borderColor: 'gold',
+                        data: monthlyData.internet.map((value, i) => (value / totalMonthlyExpenses[i] * 100).toFixed(2))
+                    },
+                    {
+                        label: 'Loisir',
+                        backgroundColor: 'lightgreen',
+                        borderColor: 'gold',
+                        data: monthlyData.loisir.map((value, i) => (value / totalMonthlyExpenses[i] * 100).toFixed(2))
+                    },
+                    {
+                        label: 'Divers',
+                        backgroundColor: 'lightblue',
+                        borderColor: 'gold',
+                        data: monthlyData.divers.map((value, i) => (value / totalMonthlyExpenses[i] * 100).toFixed(2))
+                    }
+                ]
+            };
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: {
+                                color: 'gold'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            ticks: {
+                                color: 'gold',
+                                beginAtZero: true,
+                                max: 100,
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'gold'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return tooltipItem.dataset.label + ': ' + tooltipItem.raw + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update the monthly totals table
+            const totalsRow = document.getElementById('monthlyTotals');
+            totalsRow.innerHTML = '';
+            totalMonthlyExpenses.forEach(total => {
+                const cell = document.createElement('td');
+                cell.textContent = total.toFixed(2) + ' €';
+                totalsRow.appendChild(cell);
+            });
+            document.getElementById('monthlyTotalsTable').style.display = 'table';
+        }
+
+        function selectYear() {
+            const year = prompt('Veuillez entrer l\'année:', new Date().getFullYear());
+            if (year && !isNaN(year)) {
+                createChart(parseInt(year));
+            }
+        }
+
+        function downloadData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(expenses));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "expenses.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function restoreData(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                expenses = JSON.parse(event.target.result);
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                const currentYear = new Date().getFullYear();
+                createChart(currentYear);
+            };
+            reader.readAsText(file);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentYear = new Date().getFullYear();
+            createChart(currentYear);
+        });
+    </script>
+</body>
+</html>

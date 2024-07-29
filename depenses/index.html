@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes Dépenses</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        input, button {
+            border: 2px solid gold;
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            text-align: center; /* Centrer le texte dans l'entrée */
+        }
+        input {
+            width: calc(100% - 40px);
+            max-width: 300px;
+        }
+        button {
+            width: 120px;
+            cursor: pointer;
+        }
+        .buttons-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .buttons-container > div {
+            margin: 10px;
+        }
+        .alimentation { background-color: lightcoral; }
+        .internet { background-color: lightyellow; }
+        .loisir { background-color: lightgreen; }
+        .divers { background-color: lightblue; }
+        .history { background-color: lightsteelblue; }
+        #expenses {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        #expenses th, #expenses td {
+            border: 1px solid gold;
+            padding: 10px;
+            color: black; /* Changer la couleur de la police à noir */
+        }
+        #expenses th {
+            background-color: lightsteelblue;
+            color: black;
+        }
+        .sum-display {
+            color: gold;
+            font-size: 18px;
+            margin-top: -10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mes Dépenses</h1>
+    <input type="number" id="amount" placeholder="Montant de la dépense" required>
+    <div class="buttons-container">
+        <div>
+            <button class="alimentation" onclick="addExpense('alimentation', 'lightcoral')">Alimentation</button>
+            <div class="sum-display alimentation-sum">0.00 €</div>
+        </div>
+        <div>
+            <button class="internet" onclick="addExpense('internet', 'lightyellow')">Internet</button>
+            <div class="sum-display internet-sum">0.00 €</div>
+        </div>
+        <div>
+            <button class="loisir" onclick="addExpense('loisir', 'lightgreen')">Loisir</button>
+            <div class="sum-display loisir-sum">0.00 €</div>
+        </div>
+        <div>
+            <button class="divers" onclick="addExpense('divers', 'lightblue')">Divers</button>
+            <div class="sum-display divers-sum">0.00 €</div>
+        </div>
+    </div>
+    <button class="history" onclick="showHistory()">Afficher l'historique</button>
+    <button class="history" onclick="window.location.href='histogramme.html'">Voir l'histogramme</button>
+    <button class="history" onclick="downloadData()">Télécharger JSON</button>
+    <input type="file" id="fileInput" style="display:none;" onchange="restoreData(event)">
+    <button class="history" onclick="document.getElementById('fileInput').click()">Restaurer JSON</button>
+    <button class="history" onclick="toggleVisibility(false)">Masquer Données</button>
+    <button class="history" onclick="toggleVisibility(true)">Démasquer Données</button>
+    <table id="expenses" style="display:none;">
+        <thead>
+            <tr>
+                <th>Coché</th>
+                <th>Date</th>
+                <th>Somme</th>
+                <th>Famille</th>
+            </tr>
+        </thead>
+        <tbody id="expenseBody">
+        </tbody>
+    </table>
+    <script>
+        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+
+        function addExpense(category, color) {
+            const amount = document.getElementById('amount').value;
+            if (!amount) return alert('Veuillez entrer un montant');
+            
+            const expense = {
+                date: new Date().toLocaleDateString('fr-FR'),
+                amount: parseFloat(amount).toFixed(2),
+                category: category,
+                color: color,
+                checked: true
+            };
+
+            expenses.unshift(expense); // Add the newest expense at the beginning
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            document.getElementById('amount').value = '';
+            updateSumDisplays();
+        }
+
+        function updateSumDisplays() {
+            const sums = {
+                alimentation: 0,
+                internet: 0,
+                loisir: 0,
+                divers: 0
+            };
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+
+            expenses.forEach(expense => {
+                const expenseDate = new Date(expense.date.split('/').reverse().join('-'));
+                if (expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear) {
+                    sums[expense.category] += parseFloat(expense.amount);
+                }
+            });
+
+            document.querySelector('.alimentation-sum').innerText = `${sums.alimentation.toFixed(2)} €`;
+            document.querySelector('.internet-sum').innerText = `${sums.internet.toFixed(2)} €`;
+            document.querySelector('.loisir-sum').innerText = `${sums.loisir.toFixed(2)} €`;
+            document.querySelector('.divers-sum').innerText = `${sums.divers.toFixed(2)} €`;
+        }
+
+        function showHistory() {
+            const table = document.getElementById('expenses');
+            const tbody = document.getElementById('expenseBody');
+            tbody.innerHTML = '';
+            expenses.forEach((expense, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="checkbox" ${expense.checked ? 'checked' : ''} onchange="toggleCheck(${index})"></td>
+                    <td style="background-color: lightsteelblue;">${expense.date}</td>
+                    <td style="background-color: ${expense.color};">${expense.amount} €</td>
+                    <td style="background-color: ${expense.color};">${expense.category}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            table.style.display = 'table';
+        }
+
+        function toggleCheck(index) {
+            const checkbox = event.target;
+            if (checkbox.checked) {
+                checkbox.checked = false; // Prevent re-checking
+                alert("Vous devez faire un appui long pour recocher.");
+            } else {
+                expenses[index].checked = false;
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+            }
+        }
+
+        document.addEventListener('contextmenu', (event) => {
+            if (event.target.type === 'checkbox') {
+                event.preventDefault();
+                const index = Array.from(document.querySelectorAll('#expenseBody input[type="checkbox"]')).indexOf(event.target);
+                if (index > -1 && !event.target.checked) {
+                    event.target.checked = true;
+                    expenses[index].checked = true;
+                    localStorage.setItem('expenses', JSON.stringify(expenses));
+                }
+            }
+        });
+
+        function downloadData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(expenses));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "expenses.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function restoreData(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                expenses = JSON.parse(event.target.result);
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                updateSumDisplays();
+                showHistory();
+            };
+            reader.readAsText(file);
+        }
+
+        function toggleVisibility(show) {
+            const rows = document.querySelectorAll('#expenseBody tr');
+            rows.forEach(row => {
+                const checkbox = row.querySelector('input[type="checkbox"]');
+                if (checkbox && !checkbox.checked) {
+                    row.style.display = show ? '' : 'none';
+                }
+            });
+        }
+
+        // Update the sums on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSumDisplays();
+            showHistory();
+        });
+    </script>
+</body>
+</html>
